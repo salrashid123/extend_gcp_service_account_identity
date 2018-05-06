@@ -1,14 +1,10 @@
 # Extend GCP Service Account Identity and Token Scope on AppEngine and Cloud Functions
 
-This is just a an extension and implementation of a sample procedure I outlined last year to [impersonate another service account on GCP](https://medium.com/google-cloud/using-serviceaccountactor-iam-role-for-account-impersonation-on-google-cloud-platform-a9e7118480ed).
+The service_account Identity on GAE and Cloud Functions is static at the moment...its always ```YOUR_APPID@appspot.gserviceaccount.com``` What if you needed a different service account andan [oauth2 access_token](https://cloud.google.com/appengine/docs/standard/python/appidentity/#asserting_identity_to_google_apis) that carried different scopes and capabilities? There is no real easy procedure to do this but this article details one approach outlined last year to impersonate another service account on GCP. The approach here basically runs the oauth2 token flow manually using a specific (powerful) GCP IAM capabiltiy: Service Account Token Creator role.
 
-The reason this came up recently is not just academic:  the default service account for AppEngine and Cloud Functions is not mutable and the 
-scopes any access token provided in those enviornments is static.  In GAE and GKE you can atleast define your own service account and that capability
-will certainly make it to other environments later. For now, the token is static.  Also, even if another service account can get defined, its scope is still static.  What that means, is the destination resources on Google are preset..there is no way you can access GSuites Resources (eg. ```drive_v1``` or ```reports_v1```)
+One usecase for that is detailed in the article i’ve referenced earlier which is to perform [GSuites Administration actions from GAE](https://medium.com/@salmaan.rashid/consuming-and-validating-gsuites-audit-push-notification-on-appengine-a98a178ee82e).
 
-You can use IAM Policies on identities (service account identity) to restrict access to GCP resources but what this procedure does is
-to allow GAE/GCF's default static service account to assume the identity of another one (which presumably would have access to a resource).  Furthermore,
-this also shows you how to acquire an ```access_token``` for non-GCP (but Google) resources that are not even present in the default catch-all ```https://www.googleapis.com/auth/cloud-platform``` scope.
+You can use IAM Policies on identities (service account identity) to restrict access to GCP resources but what this procedure does is to allow GAE/GCF’s default static service account to assume the identity of another one (which would have access to the resource).
 
 In other words, on GAE/GCF
 
@@ -42,6 +38,32 @@ You can potentially mitigate this with saving a token thread_local for the durat
 ## Implemenation
 
 The attached code here allows you to deploy either a GAE Standard Python applicaiton or Google Cloud Funcitons node.js app that performs the steps detailed in the links above (specifically [this one](https://medium.com/google-cloud/using-serviceaccountactor-iam-role-for-account-impersonation-on-google-cloud-platform-a9e7118480ed) )
+
+ust to be clear, you can at anytime (without this procedure), request a GAE/GCF for an access_token with your own scopes easily as shown below
+
+```python
+EXTRA_SCOPES = [
+'https://www.googleapis.com/auth/books',
+'https://www.googleapis.com/auth/admin.reports.usage.readonly'
+]
+
+credentials = GoogleCredentials.get_application_default()     credentials = credentials.create_scoped(EXTRA_SCOPES)
+```
+
+but what you can’t do is change to identity or ask for additional claims (i.,e [.create_delegated()](http://oauth2client.readthedocs.io/en/latest/source/oauth2client.service_account.html#oauth2client.service_account.ServiceAccountCredentials.create_delegated))
+
+You will also find the issued_to and audience of the default GAE/GCF tokens are set to ```anonymous``
+
+```json
+{  
+  "issued_to": "anonymous",  
+  "audience": "anonymous",  
+  "scope": "https://www.googleapis.com/auth/books",  
+  "expires_in": 2263,  
+  "access_type": "offline" 
+}
+```
+
 
 Admittedly, the code isn't pretty (I barely know nodejs) but it does work (i'll gladly take pull requests to fix anything...i just felt its more important
 to go through the steps in excruciating(!) detail.)
@@ -108,8 +130,11 @@ you should see an output like this:
 }
 ```
 
-Which is just the output of the [tokeninfo](https://developers.google.com/apis-explorer/#p/oauth2/v2/oauth2.tokeninfo) endpoint...it just shows
-details of an ```access_token```.   So, what does the above show?  well, the token is for ```impersonated-account@fabled-ray-104117.iam.gserviceaccount.com``` and has scopes that include ```https://www.googleapis.com/auth/books```
+Which is just the output of the tokeninfo endpoint…it just shows details of an access_token.   So, what does the above show?  well, the token is for impersonated-account@fabled-ray-104117.iam.gserviceaccount.com and has scopes that include https://www.googleapis.com/auth/books 
+“109197377574461529694” is the UniqueID (clientID) of the service account which you can see in the cloud console too:
+
+![images/impersonated.png](images/impersonated.png)
+
 
 The code attached just calls the tokeninfo enpoint raw and passes the token directly.  For a better idomatic experience, you can make use of GCP libraries that allow you to specify the token and have a ```credential``` object to use.  For more info see [AccessTokenCredentials](http://oauth2client.readthedocs.io/en/latest/source/oauth2client.client.html#oauth2client.client.AccessTokenCredentials)
 
