@@ -1,5 +1,7 @@
 # Extend GCP Service Account Identity and Token Scope on AppEngine and Cloud Functions
 
+>> Update 5/7/21 (shoud've done it sooner): Appengine, Cloud Functions and Run now allow you to specify the scopes via API call:, see https://cloud.google.com/functions/docs/securing/function-identity#access_tokens (which basically means, this article is dated/stale; stop reading)
+
 The service_account Identity on GAE and Cloud Functions is static at the moment...its always ```YOUR_APPID@appspot.gserviceaccount.com``` What if you needed a different service account andan [oauth2 access_token](https://cloud.google.com/appengine/docs/standard/python/appidentity/#asserting_identity_to_google_apis) that carried different scopes and capabilities? There is no real easy procedure to do this but this article details one approach outlined last year to impersonate another service account on GCP. The approach here basically runs the oauth2 token flow manually using a specific (powerful) GCP IAM capabiltiy: Service Account Token Creator role.
 
 One usecase for that is detailed in the article i’ve referenced earlier which is to perform [GSuites Administration actions from GAE](https://medium.com/@salmaan.rashid/consuming-and-validating-gsuites-audit-push-notification-on-appengine-a98a178ee82e).
